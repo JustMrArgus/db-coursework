@@ -506,7 +506,7 @@ def delete_role(role_id):
     return jsonify({'message': 'Role deleted successfully'})
 ```
 
-### Створення маршрутизації
+### Налаштування маршрутизації
 #### Media routes (media_routes.py)
 ```py
 from flask import Blueprint, request
@@ -533,7 +533,7 @@ def handle_media_item(media_id):
     if request.method == 'DELETE':
         return controller.delete_media(media_id)
 ```
-#### User routes (user_routes.py)
+#### Users routes (users_routes.py)
 ```py
 from flask import Blueprint, request
 import controllers.users_controller as controller
