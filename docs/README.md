@@ -9,7 +9,7 @@ footer: "ECL 2.0 Licensed | Copyright © [2024] [Oleksandr Rodina]"
 
 **Виконав:** 
 
-*студент 2-го курсу, групи ІМ-33* **Олександр РОДІНА** Telegram: [@justargus](https://t.me/justargus)\
+*студент 2-го курсу, групи ІМ-33* **Олександр РОДІНА** Telegram: [@justargus](https://t.me/justargus)
 
 
 **Керівник**
