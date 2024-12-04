@@ -233,7 +233,7 @@ COMMIT;
 
 ## RESTfull сервіс для управління даними
 
-### Налаштування Flask додатку
+### Налаштування Flask додатка (app.py)
 ```py
 from flask import Flask
 from extensions import db
@@ -258,4 +258,331 @@ register_error_handlers(app)
 
 if __name__ == '__main__':
     app.run()
+```
+
+### Ініціалізація SQLAlchemy (extensions.py)
+```py
+from flask_sqlalchemy import SQLAlchemy
+
+db = SQLAlchemy()
+```
+
+### Створення SQLAlchemy моделей таблиць бази данних (models.py)
+```py
+from extensions import db
+
+class Role(db.Model):
+    __tablename__ = 'Role'
+    id = db.Column(db.Integer, primary_key=True)
+    roleName = db.Column(db.String(45), nullable=False)
+    permission = db.Column(db.String(45), nullable=False)
+
+class User(db.Model):
+    __tablename__ = 'User'
+    id = db.Column(db.Integer, primary_key=True)
+    firstName = db.Column(db.String(45), nullable=False)
+    lastName = db.Column(db.String(45), nullable=False)
+    email = db.Column(db.String(45), unique=True, nullable=False)
+    password = db.Column(db.String(45), nullable=False)
+
+class Media(db.Model):
+    __tablename__ = 'Media'
+    id = db.Column(db.Integer, primary_key=True)
+    title = db.Column(db.String(45), nullable=False)
+    keywords = db.Column(db.String(45), nullable=False)
+    createdAt = db.Column(db.Date, nullable=False)
+    updatedAt = db.Column(db.Date, nullable=False)
+    userId = db.Column(db.Integer, db.ForeignKey('User.id'), nullable=False)
+```
+
+### Створення обробників базових помилок (error_handlers.py)
+```py
+from flask import jsonify
+
+def register_error_handlers(app):
+    @app.errorhandler(404)
+    def resource_not_found(e):
+        return jsonify({'error': 'Resource not found'}), 404
+
+    @app.errorhandler(400)
+    def bad_request(e):
+        return jsonify({'error': 'Bad request'}), 400
+
+    @app.errorhandler(Exception)
+    def handle_generic_error(e):
+        return jsonify({'error': f'An unexpected internal server error occurred: {str(e)}'}), 500
+```
+
+### Створення контролерів додатака
+#### Media controller (media_controller.py)
+```py
+from models import Media
+from extensions import db
+from sqlalchemy.exc import IntegrityError
+from flask import jsonify, request
+
+def get_all_media():
+    media_items = Media.query.all()
+    return jsonify([{
+        'id': media.id,
+        'title': media.title,
+        'keywords': media.keywords,
+        'createdAt': media.createdAt.isoformat(),
+        'updatedAt': media.updatedAt.isoformat(),
+        'userId': media.userId
+    } for media in media_items])
+
+def create_media():
+    data = request.json
+    try:
+        new_media = Media(
+            title=data['title'],
+            keywords=data['keywords'],
+            createdAt=data['createdAt'],
+            updatedAt=data['updatedAt'],
+            userId=data['userId']
+        )
+        db.session.add(new_media)
+        db.session.commit()
+        return jsonify({'message': 'Media item created successfully'}), 201
+    except IntegrityError:
+        db.session.rollback()
+        return jsonify({'error': 'Invalid data or user does not exist'}), 400
+
+def get_media(media_id):
+    media = Media.query.get(media_id)
+    if not media:
+        return jsonify({'error': 'Media item not found'}), 404
+    return jsonify({
+        'id': media.id,
+        'title': media.title,
+        'keywords': media.keywords,
+        'createdAt': media.createdAt.isoformat(),
+        'updatedAt': media.updatedAt.isoformat(),
+        'userId': media.userId
+    })
+
+def update_media(media_id):
+    media = Media.query.get(media_id)
+    if not media:
+        return jsonify({'error': 'Media item not found'}), 404
+    data = request.json
+    media.title = data.get('title', media.title)
+    media.keywords = data.get('keywords', media.keywords)
+    media.createdAt = data.get('createdAt', media.createdAt)
+    media.updatedAt = data.get('updatedAt', media.updatedAt)
+    media.userId = data.get('userId', media.userId)
+    db.session.commit()
+    return jsonify({'message': 'Media item updated successfully'})
+
+def delete_media(media_id):
+    media = Media.query.get(media_id)
+    if not media:
+        return jsonify({'error': 'Media item not found'}), 404
+    db.session.delete(media)
+    db.session.commit()
+    return jsonify({'message': 'Media item deleted successfully'})
+```
+#### Users controller (users_controller.py)
+```py
+from models import User
+from extensions import db
+from sqlalchemy.exc import IntegrityError
+from flask import jsonify, request
+
+def get_all_users():
+    users = User.query.all()
+    return jsonify([{
+        'id': user.id,
+        'firstName': user.firstName,
+        'lastName': user.lastName,
+        'email': user.email,
+        'password': user.password
+    } for user in users])
+
+def create_new_user():
+    data = request.json
+    try:
+        new_user = User(
+            firstName=data['firstName'],
+            lastName=data['lastName'],
+            email=data['email'],
+            password=data['password']
+        )
+        db.session.add(new_user)
+        db.session.commit()
+        return jsonify({'message': 'User created successfully'}), 201
+    except IntegrityError:
+        db.session.rollback()
+        return jsonify({'error': 'Email already exists'}), 400
+
+def get_user(user_id):
+    user = User.query.get(user_id)
+    if user is None:
+        return jsonify({'error': 'User not found'}), 404
+    return jsonify({
+        'id': user.id,
+        'firstName': user.firstName,
+        'lastName': user.lastName,
+        'email': user.email,
+        'password': user.password
+    })
+
+def update_user(user_id):
+    user = User.query.get(user_id)
+    if user is None:
+        return jsonify({'error': 'User not found'}), 404
+    data = request.json
+    user.firstName = data.get('firstName', user.firstName)
+    user.lastName = data.get('lastName', user.lastName)
+    user.email = data.get('email', user.email)
+    user.password = data.get('password', user.password)
+    db.session.commit()
+    return jsonify({'message': 'User updated successfully'})
+
+def delete_user(user_id):
+    user = User.query.get(user_id)
+    if user is None:
+        return jsonify({'error': 'User not found'}), 404
+    db.session.delete(user)
+    db.session.commit()
+    return jsonify({'message': 'User deleted successfully'})
+```
+#### Roles controller (roles_controller.py)
+```py
+from extensions import db
+from models import Role
+from sqlalchemy.exc import IntegrityError
+from flask import request, jsonify
+
+def get_all_roles():
+    roles = Role.query.all()
+    return jsonify([{
+        'id': role.id,
+        'roleName': role.roleName,
+        'permission': role.permission
+    } for role in roles])
+
+def create_role():
+    data = request.json
+    try:
+        new_role = Role(
+            roleName=data['roleName'],
+            permission=data['permission']
+        )
+        db.session.add(new_role)
+        db.session.commit()
+        return jsonify({'message': 'Role created successfully'}), 201
+    except IntegrityError:
+        db.session.rollback()
+        return jsonify({'error': 'Role creation failed. Integrity error'}), 400
+
+def get_role(role_id):
+    role = Role.query.get(role_id)
+    if not role:
+        return jsonify({'error': 'Role not found'}), 404
+    return jsonify({
+        'id': role.id,
+        'roleName': role.roleName,
+        'permission': role.permission
+    })
+
+def update_role(role_id):
+    role = Role.query.get(role_id)
+    if not role:
+        return jsonify({'error': 'Role not found'}), 404
+    data = request.json
+    role.roleName = data.get('roleName', role.roleName)
+    role.permission = data.get('permission', role.permission)
+    db.session.commit()
+    return jsonify({'message': 'Role updated successfully'})
+
+def delete_role(role_id):
+    role = Role.query.get(role_id)
+    if not role:
+        return jsonify({'error': 'Role not found'}), 404
+    db.session.delete(role)
+    db.session.commit()
+    return jsonify({'message': 'Role deleted successfully'})
+```
+
+### Створення маршрутизації
+#### Media routes (media_routes.py)
+```py
+from flask import Blueprint, request
+import controllers.media_controller as controller
+
+media_bp = Blueprint('media', __name__)
+
+@media_bp.route('/', methods=['GET', 'POST'])
+def handle_media():
+    if request.method == 'GET':
+        return controller.get_all_media()
+
+    if request.method == 'POST':
+        return controller.create_media()
+
+@media_bp.route('/<int:media_id>', methods=['GET', 'PUT', 'DELETE'])
+def handle_media_item(media_id):
+    if request.method == 'GET':
+        return controller.get_media(media_id)
+
+    if request.method == 'PUT':
+        return controller.update_media(media_id)
+
+    if request.method == 'DELETE':
+        return controller.delete_media(media_id)
+```
+#### User routes (user_routes.py)
+```py
+from flask import Blueprint, request
+import controllers.users_controller as controller
+
+users_bp = Blueprint('users', __name__)
+
+@users_bp.route('/', methods=['GET', 'POST'])
+def handle_users():
+    if request.method == 'GET':
+        return controller.get_all_users()
+
+    if request.method == 'POST':
+        return controller.create_new_user()
+
+@users_bp.route('/<int:user_id>', methods=['GET', 'PUT', 'DELETE'])
+def handle_user(user_id):
+    if request.method == 'GET':
+        return controller.get_user(user_id)
+
+    if request.method == 'PUT':
+        return controller.update_user(user_id)
+
+    if request.method == 'DELETE':
+        return controller.delete_user(user_id)
+
+```
+#### Roles routes (roles_routes.py)
+```py
+from flask import Blueprint, request
+import controllers.roles_controller as controller
+
+roles_bp = Blueprint('roles', __name__)
+
+@roles_bp.route('/', methods=['GET', 'POST'])
+def handle_roles():
+    if request.method == 'GET':
+        return controller.get_all_roles()
+
+    if request.method == 'POST':
+        return controller.create_role()
+
+@roles_bp.route('/<int:role_id>', methods=['GET', 'PUT', 'DELETE'])
+def handle_role(role_id):
+    if request.method == 'GET':
+        return controller.get_role(role_id)
+
+    if request.method == 'PUT':
+        return controller.update_role(role_id)
+
+    if request.method == 'DELETE':
+        return controller.delete_role(role_id)
 ```
